@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "~/.nvm/versions/node/v20.19.4/bin/node src/index.js",
-    "dev": "~/.nvm/versions/node/v20.19.4/bin/nodemon src/index.js --host",
+    "dev": "nodemon src/index.js",
     "setup": "node scripts/setup.js",
     "compile": "truffle compile",
     "migrate:local": "truffle migrate --network development",

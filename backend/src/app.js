@@ -5,6 +5,7 @@ import healthRoutes from './routes/health.routes.js';         // Updated path
 import certificateRoutes from './routes/certificate.routes.js'; // Updated path
 import userRoutes from './routes/user.routes.js'; // Added user routes
 import emailRoutes from './routes/email.routes.js'; // Added email routes
+import courseRoutes from './routes/course.routes.js'; // Added email routes
 import cors from 'cors';
 import morgan from 'morgan';
 import { errorHandler } from './utils/errorUtils.js';
@@ -34,6 +35,7 @@ app.use('/api/health', healthRoutes); // Updated this line
 app.use('/api/users', userRoutes); // Added user routes
 app.use('/api/email', emailRoutes); // Added email routes
 app.use('/api/admin', adminRoutes);
+app.use('/api/courses', courseRoutes);
 
 // Add global error handler (must be after routes)
 app.use(errorHandler);

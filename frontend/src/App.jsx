@@ -16,6 +16,7 @@ import About from './pages/About';
 import AccountPage from './pages/AccountPage';
 import CertificatesPage from './pages/CertificatesPage';
 import RecipientCertificates from './pages/RecipientCertificates';
+import CourseManagement from './pages/courseManagement';
 
 /**
  * App Component
@@ -66,6 +67,7 @@ function App() {
               <Route path="/generate" element={<GenerateCertificate />} />
               <Route path="/upload" element={<UploadPDF />} />
               <Route path="/editor" element={<CertificateEditor />} />
+              <Route path="/courses" element={<CourseManagement />} />
             </Route>
           </Routes>
         </Layout>

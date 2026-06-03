@@ -5,11 +5,10 @@ import { io } from 'socket.io-client';
 import { FiX, FiSave, FiCopy, FiCheckCircle, FiAlertCircle, FiPlus, FiMinus } from 'react-icons/fi';
 import CertificateSuccessView from '../components/CertificateSuccessView';
 
-// Correct endpoint from server logs
 const API_ENDPOINT = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/certificates/generate`;
 
 const GenerateCertificate = () => {
-  const { getToken } = useAuth();
+  const { user, getToken } = useAuth();
   const [formData, setFormData] = useState({
     candidateName: '',
     courseName: '',
@@ -36,11 +35,11 @@ const GenerateCertificate = () => {
   const copyNotificationRef = useRef(null);
   const socketRef = useRef(null);
   const currentCertificateId = useRef(null);
+  const [courses, setCourses] = useState([]);
+  const [selectedCourse, setSelectedCourse] = useState('');
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-
-    // Handle nested additionalMetadata fields
     if (name.startsWith('additionalMetadata.')) {
       const field = name.split('.')[1];
       setFormData({
@@ -51,11 +50,20 @@ const GenerateCertificate = () => {
         }
       });
     } else {
-      setFormData({
-        ...formData,
-        [name]: value
-      });
+      setFormData({ ...formData, [name]: value });
     }
+  };
+
+  const handleCourseChange = (e) => {
+    const courseId = e.target.value;
+    const found = courses.find(c => c._id === courseId);
+    setSelectedCourse(found);
+    console.log(found)
+    setFormData(prev => ({
+      ...prev,
+      courseName: found ? found.name : '',
+      referenceId: found? found._id: '',
+    }));
   };
 
   const handleAdditionalFieldChange = (index, field, value) => {
@@ -77,6 +85,27 @@ const GenerateCertificate = () => {
     updatedFields.splice(index, 1);
     setAdditionalFields(updatedFields);
   };
+
+  // Load courses for the logged-in institute
+  const instituteId = user?._id || user?.id;
+
+  const fetchCourses = async () => {
+    if (!instituteId) return;
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const { data } = await axios.get(`${API_URL}/api/courses/${instituteId}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      setCourses(data.courses);
+    } catch (err) {
+      console.log("Failed loading")
+      setCourses([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchCourses();
+  }, [user]);
 
   // Setup WebSocket connection for real-time status updates
   useEffect(() => {
@@ -179,10 +208,10 @@ const GenerateCertificate = () => {
     try {
       const token = getToken();
 
-      // Prepare the payload with all fields
       const payload = {
         ...formData,
-        // Add additional fields from the dynamic form
+        courseName: selectedCourse?.name || undefined,
+        referenceId: selectedCourse?._id || undefined,
         additionalMetadata: {
           ...formData.additionalMetadata,
           ...additionalFields.reduce((acc, field) => {
@@ -210,12 +239,8 @@ const GenerateCertificate = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      console.log("Certificate generation response:", response.data);
-
-      // Handle the new standardized API response format
       if (response.data && response.data.success) {
         setSuccess(true);
-        // Transform the response data to match the expected structure
         const transformedData = {
           certificateId: response.data.data.certificateId,
           shortCode: response.data.data.verificationCode,
@@ -229,8 +254,6 @@ const GenerateCertificate = () => {
           ipfsHash: response.data.data.computedHashes?.ipfsHash
         };
         setCertificateData(transformedData);
-        
-        // Set current certificate ID for WebSocket updates
         currentCertificateId.current = response.data.data.certificateId;
         setCertificateStatus('PENDING');
       } else {
@@ -270,6 +293,7 @@ const GenerateCertificate = () => {
       }
     });
     setAdditionalFields([]);
+    setSelectedCourse('');
     setIncludeDeveloperPage(false);
     setSuccess(false);
     setCertificateData(null);
@@ -384,33 +408,21 @@ const GenerateCertificate = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Course Name*
                       </label>
-                      <input
-                        type="text"
-                        name="courseName"
-                        value={formData.courseName}
-                        onChange={handleInputChange}
+                      <select
+                        value={selectedCourse?._id}
+                        onChange={handleCourseChange}
                         className="w-full p-2.5 border border-gray-300 rounded-sm focus:ring-2 focus:ring-gray-400 focus:outline-none"
-                        placeholder="Enter course or program name"
                         required
-                      />
+                      >
+                        <option value="">Select course</option>
+                        {courses.map(c => (
+                          <option key={c._id} value={c._id}>{c.code} — {c.name}</option>
+                        ))}
+                      </select>
                       <p className="text-xs text-gray-500 mt-1">Name of the course or achievement being certified</p>
                     </div>
 
                     {/* Reference ID */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Reference ID
-                      </label>
-                      <input
-                        type="text"
-                        name="referenceId"
-                        value={formData.referenceId}
-                        onChange={handleInputChange}
-                        className="w-full p-2.5 border border-gray-300 rounded-sm focus:ring-2 focus:ring-gray-400 focus:outline-none"
-                        placeholder="e.g., COURSE123-A"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Optional internal reference. Auto-generated if left empty</p>
-                    </div>
                   </div>
                 </div>
 
