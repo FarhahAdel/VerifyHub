@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   FiHome, FiFileText, FiCheckSquare, FiUpload, FiUser,
-  FiLogOut, FiMenu, FiX, FiLogIn, FiInfo, FiChevronDown, FiList
+  FiLogOut, FiMenu, FiX, FiLogIn, FiInfo, FiChevronDown, FiList, FiUserPlus
 } from 'react-icons/fi';
 
 // Add CSS for dropdown animation without needing tailwind config
@@ -117,6 +117,11 @@ export default function Header() {
         { icon: FiFileText, label: "Generate", path: "/generate" },
         { icon: FiUpload, label: "Upload", path: "/upload" }
       ];
+    } else if (user.role === 'STUDENT') {
+      return [
+        ...commonItems,
+        { icon: FiUserPlus, label: "Enroll", path: "/enroll" },
+      ];
     } else if (user.role === 'VERIFIER') {
       return [
         ...commonItems,
@@ -148,6 +153,18 @@ export default function Header() {
         { icon: FiFileText, label: "Issued Certificates", path: '/certificates' },
         { icon: FiUpload, label: "Upload Certificate", path: '/upload' },
         { icon: FiFileText, label: "Generate Certificate", path: '/generate' },
+        { icon: FiInfo, label: "About", path: '/about' },
+        { icon: FiLogOut, label: "Sign Out", action: handleLogout, divider: true }
+      ];
+    }
+
+    // Student-specific items
+    if (user?.role === 'STUDENT') {
+      return [
+        { icon: FiUser, label: "Profile", path: '/account' },
+        { icon: FiUserPlus, label: "Enroll in Institute", path: '/enroll' },
+        { icon: FiFileText, label: "My Certificates", path: '/certificates' },
+        { icon: FiCheckSquare, label: "Verify Certificate", path: '/verify' },
         { icon: FiInfo, label: "About", path: '/about' },
         { icon: FiLogOut, label: "Sign Out", action: handleLogout, divider: true }
       ];

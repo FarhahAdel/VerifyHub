@@ -25,7 +25,7 @@ const UserSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['INSTITUTE', 'VERIFIER'],
+    enum: ['INSTITUTE', 'VERIFIER', 'STUDENT'],
     required: true
   },
   // Cryptographic fields for Institute role
@@ -35,10 +35,9 @@ const UserSchema = new mongoose.Schema({
     trim: true,
     validate: {
       validator: function (v) {
-        // Basic validation to make sure the key is at least present
-        return this.role !== 'INSTITUTE' || v;
+        return !['INSTITUTE', 'STUDENT'].includes(this.role) || v;
       },
-      message: props => 'Public key is required for Institute users'
+      message: props => 'Public key is required for Institute and Student users'
     }
   },
   privateKey: {
@@ -47,10 +46,9 @@ const UserSchema = new mongoose.Schema({
     trim: true,
     validate: {
       validator: function (v) {
-        // Basic validation to make sure the key is at least present
-        return this.role !== 'INSTITUTE' || v;
+        return !['INSTITUTE', 'STUDENT'].includes(this.role) || v;
       },
-      message: props => 'Private key is required for Institute users'
+      message: props => 'Private key is required for Institute and Student users'
     }
   },
   walletAddress: {
@@ -175,8 +173,8 @@ UserSchema.methods = {
 
   // Method to sign data with user's private key
   signData: async function (data) {
-    if (this.role !== 'INSTITUTE' || !this.privateKey) {
-      throw new Error('Only institutes with private keys can sign data');
+    if (!['INSTITUTE', 'STUDENT'].includes(this.role) || !this.privateKey) {
+      throw new Error('Only institutes and students with private keys can sign data');
     }
 
     // Import the cryptoUtils dynamically to avoid circular dependencies

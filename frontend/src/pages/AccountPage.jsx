@@ -360,7 +360,7 @@ const AccountPage = () => {
                               </div>
                             </div>
 
-                            {user.role === 'INSTITUTE' && (
+                            {(user.role === 'INSTITUTE' || user.role === 'STUDENT') && (
                               <div className="md:col-span-2 space-y-4">
                                 <div className="bg-gray-50 border border-gray-200 rounded-sm p-3 mb-1">
                                   <div className="flex items-start">

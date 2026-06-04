@@ -278,6 +278,7 @@ export default function AuthPage() {
                       >
                         <option value="INSTITUTE">INSTITUTE</option>
                         <option value="VERIFIER">VERIFIER</option>
+                        <option value="STUDENT">STUDENT</option>
                       </select>
                     </div>
                   </div>

@@ -38,6 +38,11 @@ const GenerateCertificate = () => {
   const [courses, setCourses] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState('');
 
+  // Student lookup state
+  const [studentEmail, setStudentEmail] = useState('');
+  const [studentLookupStatus, setStudentLookupStatus] = useState('idle'); // idle | loading | found | not_found
+  const [selectedStudent, setSelectedStudent] = useState(null); // { id, name, email, walletAddress }
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     if (name.startsWith('additionalMetadata.')) {
@@ -106,6 +111,44 @@ const GenerateCertificate = () => {
   useEffect(() => {
     fetchCourses();
   }, [user]);
+
+  // Look up a student by email
+  const lookupStudent = async (email) => {
+    if (!email || !email.includes('@')) return;
+    setStudentLookupStatus('loading');
+    setSelectedStudent(null);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+      // Lookup student
+      const { data } = await axios.get(`${API_URL}/api/users/lookup-student`, {
+        params: { email },
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!data.success || !data.data) {
+        setStudentLookupStatus('not_found');
+        return;
+      }
+      const student = data.data;
+      console.log(student)
+      setSelectedStudent(student);
+      setStudentLookupStatus(student.isEnrolled ? 'found' : 'not_enrolled');
+      console.log(studentLookupStatus);
+      if (student.isEnrolled) {
+        setFormData(prev => ({ ...prev, candidateName: student.name }));
+      }
+    } catch {
+      setStudentLookupStatus('not_found');
+    }
+  };
+
+  const handleStudentEmailChange = (e) => {
+    const email = e.target.value;
+    setStudentEmail(email);
+    setStudentLookupStatus('idle');
+    setSelectedStudent(null);
+    setFormData(prev => ({ ...prev, candidateName: '' }));
+  };
 
   // Setup WebSocket connection for real-time status updates
   useEffect(() => {
@@ -205,11 +248,22 @@ const GenerateCertificate = () => {
     setLoading(true);
     setError('');
 
+    if (!selectedStudent || !selectedStudent.isEnrolled) {
+      setError(selectedStudent
+        ? 'This student is not enrolled in your institute. They must enroll first.'
+        : 'Please look up and select a registered, enrolled student before generating a certificate.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const token = getToken();
 
       const payload = {
         ...formData,
+        candidateName: selectedStudent?.name || formData.candidateName,
+        recipientEmail: selectedStudent?.email || formData.recipientEmail,
+        recipientWalletAddress: selectedStudent?.walletAddress || null,
         courseName: selectedCourse?.name || undefined,
         referenceId: selectedCourse?._id || undefined,
         additionalMetadata: {
@@ -294,6 +348,9 @@ const GenerateCertificate = () => {
     });
     setAdditionalFields([]);
     setSelectedCourse('');
+    setStudentEmail('');
+    setStudentLookupStatus('idle');
+    setSelectedStudent(null);
     setIncludeDeveloperPage(false);
     setSuccess(false);
     setCertificateData(null);
@@ -369,38 +426,57 @@ const GenerateCertificate = () => {
                 <div className="border-b border-gray-200 pb-4 mb-4">
                   <h3 className="text-md font-medium text-gray-700 mb-3">Required Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Candidate Name */}
-                    <div>
+                    {/* Student Lookup by Email */}
+                    <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Candidate Name*
+                        Recipient Student Email*
                       </label>
-                      <input
-                        type="text"
-                        name="candidateName"
-                        value={formData.candidateName}
-                        onChange={handleInputChange}
-                        className="w-full p-2.5 border border-gray-300 rounded-sm focus:ring-2 focus:ring-gray-400 focus:outline-none"
-                        placeholder="Enter recipient's full name"
-                        required
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Full name as it will appear on the certificate</p>
-                    </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="email"
+                          value={studentEmail}
+                          onChange={handleStudentEmailChange}
+                          className="flex-1 p-2.5 border border-gray-300 rounded-sm focus:ring-2 focus:ring-gray-400 focus:outline-none"
+                          placeholder="Enter student's registered email"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => lookupStudent(studentEmail)}
+                          disabled={studentLookupStatus === 'loading' || !studentEmail.includes('@')}
+                          className="px-4 py-2.5 bg-gray-700 text-white rounded-sm hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium whitespace-nowrap"
+                        >
+                          {studentLookupStatus === 'loading' ? 'Looking up…' : 'Look Up'}
+                        </button>
+                      </div>
 
-                    {/* Recipient Email */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Recipient Email*
-                      </label>
-                      <input
-                        type="email"
-                        name="recipientEmail"
-                        value={formData.recipientEmail}
-                        onChange={handleInputChange}
-                        className="w-full p-2.5 border border-gray-300 rounded-sm focus:ring-2 focus:ring-gray-400 focus:outline-none"
-                        placeholder="Enter recipient's email address"
-                        required
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Email to send the certificate to</p>
+                      {/* Lookup result */}
+                      {studentLookupStatus === 'found' && selectedStudent && (
+                        <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-sm flex items-start gap-2">
+                          <FiCheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                          <div className="text-sm">
+                            <p className="font-medium text-green-800">{selectedStudent.name}</p>
+                            <p className="text-green-700 text-xs mt-0.5 font-mono">{selectedStudent.walletAddress}</p>
+                            <p className="text-green-600 text-xs mt-0.5">✓ Enrolled in your institute</p>
+                          </div>
+                        </div>
+                      )}
+                      {studentLookupStatus === 'not_enrolled' && selectedStudent && (
+                        <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-sm flex items-start gap-2">
+                          <FiAlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                          <div className="text-sm">
+                            <p className="font-medium text-amber-800">{selectedStudent.name} found, but not enrolled in your institute</p>
+                            <p className="text-amber-700 text-xs mt-1">The student must enroll in your institute before you can issue them a certificate.</p>
+                          </div>
+                        </div>
+                      )}
+                      {studentLookupStatus === 'not_found' && (
+                        <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-sm flex items-center gap-2">
+                          <FiAlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                          <p className="text-sm text-red-700">No registered student found with that email.</p>
+                        </div>
+                      )}
+                      <p className="text-xs text-gray-500 mt-1">The certificate will be issued to this student's blockchain wallet</p>
                     </div>
 
                     {/* Course Name */}

@@ -24,7 +24,7 @@ import crypto from 'crypto';
 import axios from 'axios';
 import { generateCertificatePdf } from '../utils/pdfUtils.js';
 import * as pinata from '../utils/pinata.js';
-import { web3, contract, getWeb3, getContract } from '../utils/blockchain.js';
+import { web3, contract, getWeb3, getContract, getStudentRegistryContract } from '../utils/blockchain.js';
 import { PINATA_GATEWAY_BASE_URL } from '../constants.js';
 import Certificate from '../models/certificate.model.js';
 import { CID } from 'multiformats/cid'
@@ -220,7 +220,8 @@ export const generateCertificate = async (req, res) => {
       issuedDate,
       institutionLogo: requestInstitutionLogo,
       validUntil,
-      recipientEmail // Extract recipient email
+      recipientEmail, // Extract recipient email
+      recipientWalletAddress // Extract recipient wallet address (student wallet)
     } = req.body;
 
     // Auto-use institution from logged-in user (production-ready approach)
@@ -287,6 +288,42 @@ export const generateCertificate = async (req, res) => {
         },
         meta: { generationId }
       });
+    }
+
+    // ======================
+    // 1b. Enrollment Check
+    // ======================
+    // The issuing institute can only generate a cert for a student enrolled in it.
+    if (recipientWalletAddress) {
+      try {
+        const registry = getStudentRegistryContract();
+        const instituteWallet = req.user?.walletAddress;
+
+        if (!instituteWallet) {
+          return res.status(400).json({
+            error: { code: 'INSTITUTE_NO_WALLET', message: 'Institute account has no wallet address' },
+            meta: { generationId }
+          });
+        }
+
+        const isEnrolled = await registry.methods
+          .isEnrolledIn(recipientWalletAddress, instituteWallet)
+          .call();
+
+        if (!isEnrolled) {
+          return res.status(403).json({
+            error: {
+              code: 'STUDENT_NOT_ENROLLED',
+              message: 'This student is not enrolled in your institute. They must enroll before you can issue them a certificate.',
+            },
+            meta: { generationId }
+          });
+        }
+        console.log(`[${generationId}] Enrollment verified: student ${recipientWalletAddress} → institute ${instituteWallet}`);
+      } catch (enrollErr) {
+        // If StudentRegistry isn't deployed yet, log a warning but don't hard-block
+        console.warn(`[${generationId}] Enrollment check failed (StudentRegistry may not be deployed):`, enrollErr.message);
+      }
     }
 
     // ======================
@@ -607,6 +644,7 @@ export const generateCertificate = async (req, res) => {
         cryptographicSignature: additionalMetadata.cryptographicSignature,
         issuer: req.user?.id,
         recipientEmail: recipientEmail,
+        recipientWalletAddress: recipientWalletAddress || null,
         ipfsHash: ipfsData.ipfsHash,
         sha256Hash: ipfsData.sha256Hash,
         cidHash: ipfsData.cidHash,
@@ -625,6 +663,24 @@ export const generateCertificate = async (req, res) => {
         },
         meta: certificateData
       });
+    }
+
+    // ======================
+    // 8b. Link Certificate to Student On-Chain
+    // ======================
+    if (recipientWalletAddress) {
+      try {
+        const registry = getStudentRegistryContract();
+        const web3Instance = getWeb3();
+        const accounts = await web3Instance.eth.getAccounts();
+        await registry.methods
+          .linkCertificate(recipientWalletAddress, certificateId)
+          .send({ from: accounts[0], gas: 200000 });
+        console.log(`[${generationId}] Certificate linked on-chain to student ${recipientWalletAddress}`);
+      } catch (linkErr) {
+        // Non-fatal: certificate is already on Certification.sol and in DB
+        console.warn(`[${generationId}] linkCertificate on StudentRegistry failed (non-fatal):`, linkErr.message);
+      }
     }
 
     // ======================
