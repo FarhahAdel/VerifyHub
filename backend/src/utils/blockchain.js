@@ -13,6 +13,7 @@ const config = {
   providerURL: process.env.PROVIDER_URL || 'http://localhost:8545',
   contractPaths: {
     abi: path.join(process.cwd(), 'build/contracts/Certification.json'),
+    studentRegistryAbi: path.join(process.cwd(), 'build/contracts/StudentRegistry.json'),
     deployment: path.join(process.cwd(), 'build/contracts/deployment_config.json')
   },
   healthCheck: {
@@ -25,6 +26,7 @@ const config = {
 let isInitialized = false;
 let contract = null;
 let web3 = null;
+let studentRegistryContract = null;
 
 // ========== ENHANCEMENT 3: Robust ABI validation ==========
 const verifyABI = (abi) => {
@@ -59,10 +61,20 @@ export const initializeBlockchain = async (retries = config.healthCheck.retries)
 
     // Load contract artifacts
     const { abi } = JSON.parse(fs.readFileSync(config.contractPaths.abi, 'utf8'));
-    const { Certification: address } = JSON.parse(fs.readFileSync(config.contractPaths.deployment, 'utf8'));
+    const deploymentConfig = JSON.parse(fs.readFileSync(config.contractPaths.deployment, 'utf8'));
+    const { Certification: address } = deploymentConfig;
 
     verifyABI(abi);
     contract = new web3.eth.Contract(abi, address);
+
+    // Load StudentRegistry if deployed
+    if (deploymentConfig.StudentRegistry && fs.existsSync(config.contractPaths.studentRegistryAbi)) {
+      const { abi: srAbi } = JSON.parse(fs.readFileSync(config.contractPaths.studentRegistryAbi, 'utf8'));
+      studentRegistryContract = new web3.eth.Contract(srAbi, deploymentConfig.StudentRegistry);
+      console.log('StudentRegistry initialized at:', deploymentConfig.StudentRegistry);
+    } else {
+      console.warn('StudentRegistry not yet deployed — run: truffle migrate (migration 3)');
+    }
 
     // Verify deployment
     const code = await web3.eth.getCode(address);
@@ -92,6 +104,11 @@ export const getWeb3 = () => {
 export const getContract = () => {
   if (!contract) throw new Error('Contract not initialized');
   return contract;
+};
+
+export const getStudentRegistryContract = () => {
+  if (!studentRegistryContract) throw new Error('StudentRegistry contract not initialized. Run: truffle migrate (migration 3)');
+  return studentRegistryContract;
 };
 
 // ========== ENHANCEMENT 6: Comprehensive health check ==========

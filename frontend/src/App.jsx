@@ -17,6 +17,7 @@ import AccountPage from './pages/AccountPage';
 import CertificatesPage from './pages/CertificatesPage';
 import RecipientCertificates from './pages/RecipientCertificates';
 import CourseManagement from './pages/courseManagement';
+import EnrollmentPage from './pages/EnrollmentPage';
 
 /**
  * App Component
@@ -68,6 +69,11 @@ function App() {
               <Route path="/upload" element={<UploadPDF />} />
               <Route path="/editor" element={<CertificateEditor />} />
               <Route path="/courses" element={<CourseManagement />} />
+            </Route>
+
+            {/* Role-Based Routes - Student Only */}
+            <Route element={<ProtectedRoute allowedRoles={['STUDENT']} />}>
+              <Route path="/enroll" element={<EnrollmentPage />} />
             </Route>
           </Routes>
         </Layout>

@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import User from '../models/user.model.js';
 
+import { errorResponse } from '../utils/errorUtils.js';
+
 dotenv.config();
 
 /**
@@ -72,6 +74,15 @@ const authMiddleware = async (req, res, next) => {
       timestamp: new Date().toISOString()
     });
   }
+};
+
+export const requireRole = (...roles) => {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+      return errorResponse('INSUFFICIENT_PERMISSIONS');
+    }
+    next();
+  };
 };
 
 export default authMiddleware;

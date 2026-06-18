@@ -5,6 +5,12 @@ import { successResponse } from '../utils/responseUtils.js';
 import { errorResponse, ErrorCodes } from '../utils/errorUtils.js';
 import crypto from 'crypto';
 import { generateKeyPair, deriveWalletAddress } from '../utils/cryptoUtils.js';
+import { isWalletUser } from '../utils/userUtils.js';
+
+const getRegistry = async () => {
+  const { getStudentRegistryContract, getWeb3 } = await import('../utils/blockchain.js');
+  return { registry: getStudentRegistryContract(), web3Instance: getWeb3() };
+};
 
 dotenv.config();
 
@@ -42,9 +48,9 @@ export const register = async (req, res) => {
     const userFields = { name, email, password, role };
 
     // Generate cryptographic keys if user is an Institute
-    if (role.toUpperCase() === 'INSTITUTE') {
+    if (isWalletUser(role)) {
       try {
-        console.log(`[${requestId}] Generating cryptographic keys for institute: ${email}`);
+        console.log(`[${requestId}] Generating cryptographic keys for ${role}: ${email}`);
         const { publicKey, privateKey } = generateKeyPair();
         const walletAddress = deriveWalletAddress(publicKey);
 
@@ -54,13 +60,17 @@ export const register = async (req, res) => {
         userFields.walletAddress = walletAddress;
         
         // Set institutionName to the name field for INSTITUTE users
-        userFields.institutionName = name;
+        if (role.toUpperCase() === 'INSTITUTE') {
+          userFields.institutionName = name;
+        }
 
         console.log(`[${requestId}] Cryptographic keys generated successfully:`);
         console.log(`[${requestId}] - Wallet address: ${walletAddress}`);
         console.log(`[${requestId}] - Public key length: ${publicKey.length} chars`);
         console.log(`[${requestId}] - Private key length: ${privateKey.length} chars`);
-        console.log(`[${requestId}] - Institution name: ${name}`);
+        if (role.toUpperCase() === 'INSTITUTE') {
+          console.log(`[${requestId}] - Institution name: ${name}`);
+        }
       } catch (keyError) {
         console.error(`[${requestId}] Error generating keys:`, keyError);
         // Continue with registration without keys if generation fails
@@ -74,6 +84,28 @@ export const register = async (req, res) => {
     const user = new User(userFields);
     await user.save();
     console.log(`[${requestId}] New user created with ID: ${user._id}`);
+
+    // Auto-register on StudentRegistry smart contract
+    if (user.walletAddress && isWalletUser(role)) {
+      try {
+        const { registry, web3Instance } = await getRegistry();
+        const accounts = await web3Instance.eth.getAccounts();
+        if (user.role === 'STUDENT') {
+          await registry.methods
+            .registerStudent(user.walletAddress, user.name)
+            .send({ from: accounts[0], gas: 200000 });
+          console.log(`[${requestId}] Student registered on-chain: ${user.walletAddress}`);
+        } else {
+          await registry.methods
+            .registerInstitute(user.walletAddress, user.institutionName || user.name)
+            .send({ from: accounts[0], gas: 200000 });
+          console.log(`[${requestId}] Institute registered on-chain: ${user.walletAddress}`);
+        }
+      } catch (chainErr) {
+        // Non-fatal: log but don't block registration
+        console.error(`[${requestId}] On-chain registration failed (non-fatal):`, chainErr.message);
+      }
+    }
 
     // Generate tokens directly (bypass User model methods)
     const token = jwt.sign(
@@ -101,8 +133,8 @@ export const register = async (req, res) => {
       role: user.role
     };
 
-    // Include wallet address for institutes
-    if (user.role.toUpperCase() === 'INSTITUTE' && user.walletAddress) {
+    // Include wallet address for institutes and students
+    if (isWalletUser(user.role) && user.walletAddress) {
       userData.walletAddress = user.walletAddress;
     }
 
@@ -263,8 +295,8 @@ export const login = async (req, res) => {
       role: user.role
     };
 
-    // Include wallet address for institutes
-    if (user.role.toUpperCase() === 'INSTITUTE' && user.walletAddress) {
+    // Include wallet address for institutes and students
+    if (isWalletUser(user.role) && user.walletAddress) {
       userData.walletAddress = user.walletAddress;
     }
 

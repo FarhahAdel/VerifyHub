@@ -4,6 +4,8 @@ import { successResponse } from '../utils/responseUtils.js';
 import { errorResponse, ErrorCodes } from '../utils/errorUtils.js';
 import { generateKeyPair, deriveWalletAddress } from '../utils/cryptoUtils.js';
 import mongoose from 'mongoose';
+import { isWalletUser } from '../utils/userUtils.js';
+import { getStudentRegistryContract } from '../utils/blockchain.js';
 
 /**
  * Get the current user's profile
@@ -26,8 +28,8 @@ export const getUserProfile = async (req, res) => {
     // Check if this is an institute user (case insensitive check)
     const isInstitute = user.role.toUpperCase() === 'INSTITUTE';
 
-    // For institute users, check if they need cryptographic keys generated
-    if (isInstitute) {
+    // For institute or student users, check if they need cryptographic keys generated
+    if (isWalletUser) {
       let needsSave = false;
       
       // Only generate keys if they don't already exist
@@ -71,7 +73,7 @@ export const getUserProfile = async (req, res) => {
     }
 
     // Determine if cryptographic keys should be included in response
-    if (!isInstitute || !includeKeys) {
+    if (!isWalletUser || !includeKeys) {
       // For non-institute users or when not explicitly requested, exclude crypto keys
       select.privateKey = 0;
       select.publicKey = 0;
@@ -383,5 +385,54 @@ export const updateUserLogo = async (req, res) => {
       message: 'Failed to update logo',
       error: error.message
     });
+  }
+};
+
+export const lookupStudent = async (req, res) => {
+  const { email } = req.query;
+
+  if (!email) {
+    return res.status(400).json({ success: false, message: 'email query parameter is required' });
+  }
+
+  try {
+    const student = await User.findOne({ email: email.toLowerCase(), role: 'STUDENT' })
+      .select('name email walletAddress _id');
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'No student found with that email' });
+    }
+
+    if (!student.walletAddress) {
+      return res.status(400).json({ success: false, message: 'Student not registered on chain' });
+    }
+
+    const registry = getStudentRegistryContract();
+    
+
+    const enrolledWallet = await registry.methods.getEnrolledInstitute(student.walletAddress).call();
+    const isEnrolled = enrolledWallet && enrolledWallet !== '0x0000000000000000000000000000000000000000';
+
+    let institute = null;
+
+    if (isEnrolled) {
+      institute = await User.findOne({ walletAddress: enrolledWallet.toLowerCase() }).select('name walletAddress');
+    }
+    console.log(institute)
+    console.log(req.user)
+    console.log(institute.walletAddress === req.user.walletAddress)
+    return res.status(200).json({
+      success: true,
+      data: {
+        id: student._id,
+        name: student.name,
+        email: student.email,
+        walletAddress: student.walletAddress,
+        isEnrolled: institute.walletAddress === req.user.walletAddress
+      }
+    });
+  } catch (error) {
+    console.error('Student lookup error:', error);
+    return res.status(500).json({ success: false, message: 'Lookup failed', error: error.message });
   }
 };
