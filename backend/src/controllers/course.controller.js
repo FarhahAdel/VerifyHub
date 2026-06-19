@@ -71,7 +71,7 @@ export const addCourse = async (req, res) => {
       name: name.trim(),
       code: code.trim().toUpperCase(),
       description: description?.trim() || "",
-      institute: req.params.userId,
+      institute: req.params.instituteId,
     });
 
     

@@ -14,6 +14,7 @@ const config = {
   contractPaths: {
     abi: path.join(process.cwd(), 'build/contracts/Certification.json'),
     studentRegistryAbi: path.join(process.cwd(), 'build/contracts/StudentRegistry.json'),
+    equivalencyAgreementAbi: path.join(process.cwd(), 'build/contracts/EquivalencyAgreement.json'),
     deployment: path.join(process.cwd(), 'build/contracts/deployment_config.json')
   },
   healthCheck: {
@@ -27,6 +28,7 @@ let isInitialized = false;
 let contract = null;
 let web3 = null;
 let studentRegistryContract = null;
+let equivalencyAgreementContract = null;
 
 // ========== ENHANCEMENT 3: Robust ABI validation ==========
 const verifyABI = (abi) => {
@@ -76,6 +78,14 @@ export const initializeBlockchain = async (retries = config.healthCheck.retries)
       console.warn('StudentRegistry not yet deployed — run: truffle migrate (migration 3)');
     }
 
+    if (deploymentConfig.EquivalencyAgreement && fs.existsSync(config.contractPaths.equivalencyAgreementAbi)) {
+      const { abi: eaAbi } = JSON.parse(fs.readFileSync(config.contractPaths.equivalencyAgreementAbi, 'utf8'));
+      equivalencyAgreementContract = new web3.eth.Contract(eaAbi, deploymentConfig.EquivalencyAgreement);
+      console.log('EquivalencyAgreement initialized at:', deploymentConfig.EquivalencyAgreement);
+    } else {
+      console.warn('EquivalencyAgreement not yet deployed — run: truffle migrate (migration 4)');
+    }
+
     // Verify deployment
     const code = await web3.eth.getCode(address);
     if (code === '0x') throw new Error('Contract not deployed');
@@ -109,6 +119,11 @@ export const getContract = () => {
 export const getStudentRegistryContract = () => {
   if (!studentRegistryContract) throw new Error('StudentRegistry contract not initialized. Run: truffle migrate (migration 3)');
   return studentRegistryContract;
+};
+
+export const getEquivalencyAgreementContract = () => {
+  if (!equivalencyAgreementContract) throw new Error('EquivalencyAgreement contract not initialized. Run: truffle migrate (migration 4)');
+  return equivalencyAgreementContract;
 };
 
 // ========== ENHANCEMENT 6: Comprehensive health check ==========
