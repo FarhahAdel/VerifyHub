@@ -1,7 +1,7 @@
 // src/routes/certificate.routes.js
 import express from 'express';
 import { pdfUpload, pdfUploadMemory } from '../middlewares/fileUpload.middleware.js';
-import authMiddleware from '../middlewares/auth.middleware.js';
+import authMiddleware, { requireRole } from '../middlewares/auth.middleware.js';
 import rateLimit from 'express-rate-limit';
 import {
   generateCertificate,
@@ -37,7 +37,7 @@ const apiLimiter = rateLimit({
 });
 
 // Certificate Generation and Upload Routes (Protected)
-router.post('/generate', authMiddleware, generateCertificate);
+router.post('/generate', authMiddleware, requireRole('INSTITUTE'), generateCertificate);
 router.post('/upload/external', authMiddleware, pdfUploadMemory.single('certificate'), uploadExternalCertificate);
 
 // Certificate Verification Routes (Public)
