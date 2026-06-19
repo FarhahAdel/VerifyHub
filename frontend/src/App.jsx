@@ -19,6 +19,7 @@ import RecipientCertificates from "./pages/RecipientCertificates";
 import CourseManagement from "./pages/courseManagement";
 import EnrollmentPage from "./pages/EnrollmentPage";
 import AgreementsPage from "./pages/AgreementsPage";
+import TransferPage from "./pages/TransferPage";
 
 /**
  * App Component
@@ -79,6 +80,7 @@ function App() {
             {/* Role-Based Routes - Student Only */}
             <Route element={<ProtectedRoute allowedRoles={["STUDENT"]} />}>
               <Route path="/enroll" element={<EnrollmentPage />} />
+              <Route path="/transfer" element={<TransferPage />} />
             </Route>
           </Routes>
         </Layout>

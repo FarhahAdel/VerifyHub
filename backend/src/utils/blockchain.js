@@ -15,6 +15,7 @@ const config = {
     abi: path.join(process.cwd(), 'build/contracts/Certification.json'),
     studentRegistryAbi: path.join(process.cwd(), 'build/contracts/StudentRegistry.json'),
     equivalencyAgreementAbi: path.join(process.cwd(), 'build/contracts/EquivalencyAgreement.json'),
+    creditTransferEvaluationAbi: path.join(process.cwd(), 'build/contracts/CreditTransferEvaluation.json'),
     deployment: path.join(process.cwd(), 'build/contracts/deployment_config.json')
   },
   healthCheck: {
@@ -29,6 +30,7 @@ let contract = null;
 let web3 = null;
 let studentRegistryContract = null;
 let equivalencyAgreementContract = null;
+let creditTransferEvaluationContract = null;
 
 // ========== ENHANCEMENT 3: Robust ABI validation ==========
 const verifyABI = (abi) => {
@@ -70,6 +72,14 @@ export const initializeBlockchain = async (retries = config.healthCheck.retries)
     contract = new web3.eth.Contract(abi, address);
 
     // Load StudentRegistry if deployed
+    if (deploymentConfig.Certification && fs.existsSync(config.contractPaths.abi)) {
+      const { abi: srAbi } = JSON.parse(fs.readFileSync(config.contractPaths.abi, 'utf8'));
+      studentRegistryContract = new web3.eth.Contract(srAbi, deploymentConfig.Certification);
+      console.log('Certification initialized at:', deploymentConfig.Certification);
+    } else {
+      console.warn('Certification not yet deployed — run: truffle migrate (migration 3)');
+    }
+
     if (deploymentConfig.StudentRegistry && fs.existsSync(config.contractPaths.studentRegistryAbi)) {
       const { abi: srAbi } = JSON.parse(fs.readFileSync(config.contractPaths.studentRegistryAbi, 'utf8'));
       studentRegistryContract = new web3.eth.Contract(srAbi, deploymentConfig.StudentRegistry);
@@ -84,6 +94,14 @@ export const initializeBlockchain = async (retries = config.healthCheck.retries)
       console.log('EquivalencyAgreement initialized at:', deploymentConfig.EquivalencyAgreement);
     } else {
       console.warn('EquivalencyAgreement not yet deployed — run: truffle migrate (migration 4)');
+    }
+
+    if (deploymentConfig.CreditTransferEvaluation && fs.existsSync(config.contractPaths.creditTransferEvaluationAbi)) {
+      const { abi: cteAbi } = JSON.parse(fs.readFileSync(config.contractPaths.creditTransferEvaluationAbi, 'utf8'));
+      creditTransferEvaluationContract = new web3.eth.Contract(cteAbi, deploymentConfig.CreditTransferEvaluation);
+      console.log('CreditTransferEvaluation initialized at:', deploymentConfig.CreditTransferEvaluation);
+    } else {
+      console.warn('CreditTransferEvaluation not yet deployed — run: truffle migrate (migration 5)');
     }
 
     // Verify deployment
@@ -124,6 +142,11 @@ export const getStudentRegistryContract = () => {
 export const getEquivalencyAgreementContract = () => {
   if (!equivalencyAgreementContract) throw new Error('EquivalencyAgreement contract not initialized. Run: truffle migrate (migration 4)');
   return equivalencyAgreementContract;
+};
+
+export const getCreditTransferEvaluationContract = () => {
+  if (!creditTransferEvaluationContract) throw new Error('CreditTransferEvaluation contract not initialized. Run: truffle migrate (migration 5)');
+  return creditTransferEvaluationContract;
 };
 
 // ========== ENHANCEMENT 6: Comprehensive health check ==========

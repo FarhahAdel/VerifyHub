@@ -17,6 +17,7 @@ import {
   FiList,
   FiUserPlus,
   FiUsers,
+  FiRepeat,
 } from "react-icons/fi";
 
 // Add CSS for dropdown animation without needing tailwind config
@@ -139,6 +140,7 @@ export default function Header() {
       return [
         ...commonItems,
         { icon: FiUserPlus, label: "Enroll", path: "/enroll" },
+        { icon: FiRepeat, label: "Transfer", path: "/transfer" },
       ];
     } else if (user.role === "VERIFIER") {
       return [
@@ -195,6 +197,7 @@ export default function Header() {
       return [
         { icon: FiUser, label: "Profile", path: "/account" },
         { icon: FiUserPlus, label: "Enroll in Institute", path: "/enroll" },
+        { icon: FiRepeat, label: "Credit Transfer", path: "/transfer" },
         { icon: FiFileText, label: "My Certificates", path: "/certificates" },
         { icon: FiCheckSquare, label: "Verify Certificate", path: "/verify" },
         { icon: FiInfo, label: "About", path: "/about" },

@@ -157,6 +157,7 @@ export const listMyAgreements = async (req, res) => {
 
     const contract = getEquivalencyAgreementContract();
     const ids = await contract.methods.getInstituteAgreements(me.walletAddress).call();
+    console.log(ids)
 
     const agreements = await Promise.all(ids.map(id => hydrateAgreement(id, contract)));
     agreements.sort((a, b) => new Date(b.proposedAt) - new Date(a.proposedAt));

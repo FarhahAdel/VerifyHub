@@ -12,6 +12,7 @@ import morgan from "morgan";
 import { errorHandler } from "./utils/errorUtils.js";
 import adminRoutes from "./routes/admin.routes.js";
 import agreementRoutes from "./routes/equivalency.routes.js"; // Bilateral equivalency agreements
+import transferRoutes from "./routes/transfer.routes.js"; // Automated credit transfer evaluation
 
 const app = express();
 
@@ -46,6 +47,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/enrollment", enrollmentRoutes);
 app.use("/api/agreements", agreementRoutes);
+app.use("/api/transfers", transferRoutes);
 
 // Add global error handler (must be after routes)
 app.use(errorHandler);
