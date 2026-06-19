@@ -329,7 +329,46 @@ export const getUserCertificates = async (req, res) => {
       }
     }
 
-    return res.json(successResponse(certificates, 'Certificates retrieved successfully'));
+    // A certificate that's been revoked-and-replaced during a credit transfer stays
+    // in the DB for history, but from the STUDENT's point of view it's the same
+    // underlying credential as whatever replaced it — they shouldn't see it as a
+    // second, separate certificate by default. Institutes still see everything they
+    // issued (including ones later revoked via a transfer out) since that's useful
+    // operational history for them. ?includeHistory=true opts a student back in.
+    const includeHistory = String(req.query.includeHistory).toLowerCase() === 'true';
+    const visibleCertificates = (user.role === 'INSTITUTE' || includeHistory)
+      ? certificates
+      : certificates.filter(c => !c.revoked);
+
+    const lineageIds = [...new Set(
+      visibleCertificates.flatMap(c => [c.supersedes, c.supersededBy]).filter(Boolean)
+    )];
+    const lineageDocs = lineageIds.length
+      ? await Certificate.find({ certificateId: { $in: lineageIds } })
+          .select('certificateId institutionName courseName issuedDate revoked')
+      : [];
+    const lineageMap = new Map(lineageDocs.map(d => [d.certificateId, d]));
+
+    const formatLineage = (id) => {
+      const d = id && lineageMap.get(id);
+      return d
+        ? { certificateId: d.certificateId, institutionName: d.institutionName, courseName: d.courseName, issuedDate: d.issuedDate, revoked: d.revoked }
+        : null;
+    };
+
+    const formattedCertificates = visibleCertificates.map(cert => {
+      const obj = cert.toObject();
+      if (cert.supersedes || cert.supersededBy || cert.transferAgreementId) {
+        obj.transfer = {
+          agreementId: cert.transferAgreementId,
+          transferredFrom: formatLineage(cert.supersedes), // the certificate this one replaced
+          transferredTo: formatLineage(cert.supersededBy),  // what later replaced this one (if anything)
+        };
+      }
+      return obj;
+    });
+
+    return res.json(successResponse(formattedCertificates, 'Certificates retrieved successfully'));
   } catch (error) {
     console.error('Error getting user certificates:', error);
     const { response, statusCode } = errorResponse('INTERNAL_ERROR', 'Failed to get certificates');

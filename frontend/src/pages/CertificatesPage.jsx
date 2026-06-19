@@ -60,6 +60,7 @@ const CertificatesPage = () => {
           status: filterStatus !== 'all' ? filterStatus.toUpperCase() : undefined
         }
       });
+      console.log(response)
 
       if (response.data.success) {
         console.log('Certificates fetched successfully:', response.data.data);
@@ -178,6 +179,13 @@ const CertificatesPage = () => {
 
   const getStatusBadge = (status) => {
     const badges = {
+      CONFIRMED: {
+        icon: <FiCheckCircle className="w-3.5 h-3.5 mr-1" />,
+        label: 'Verified',
+        bg: 'bg-gray-100',
+        text: 'text-gray-800',
+        border: 'border-gray-300'
+      },
       VERIFIED: {
         icon: <FiCheckCircle className="w-3.5 h-3.5 mr-1" />,
         label: 'Verified',
@@ -278,7 +286,7 @@ const CertificatesPage = () => {
                   <div className="flex items-center">
                     <FiCheckCircle className="w-4 h-4 mr-2 text-gray-700" />
                     <span className="text-lg font-medium text-gray-900">
-                      {certificates.filter(cert => cert.status === 'VERIFIED').length}
+                      {certificates.filter(cert => cert.status === 'VERIFIED' || cert.status === 'CONFIRMED').length}
                     </span>
                   </div>
                 </div>
@@ -433,7 +441,14 @@ const CertificatesPage = () => {
                       <div className="p-4 border-b border-gray-200">
                         <div className="flex justify-between items-start mb-2">
                           <h3 className="font-medium text-gray-900 truncate">{cert.courseName}</h3>
-                          {getStatusBadge(cert.status)}
+                          <div className="flex items-center gap-1">
+                            {getStatusBadge(cert.status)}
+                            {cert.revoked && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-xs border bg-amber-50 text-amber-800 border-amber-200">
+                                Revoked
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-center text-sm text-gray-500 mb-2">
                           <FiFileText className="w-4 h-4 mr-1 flex-shrink-0" />
@@ -498,13 +513,20 @@ const CertificatesPage = () => {
                             <div className="text-gray-500 text-xs">{cert.certificateId}</div>
                           </td>
                           <td className="py-3 px-4 text-sm text-gray-900">
-                            {user.role === 'INSTITUTE' ? cert.candidateName : cert.orgName}
+                            {user.role === 'INSTITUTE' ? cert.candidateName : (cert.orgName || cert.institutionName)}
                           </td>
                           <td className="py-3 px-4 text-sm text-gray-900">
                             {formatDate(cert.createdAt)}
                           </td>
                           <td className="py-3 px-4 text-sm">
-                            {getStatusBadge(cert.status)}
+                            <div className="flex items-center gap-1">
+                              {getStatusBadge(cert.status)}
+                              {cert.revoked && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-xs border bg-amber-50 text-amber-800 border-amber-200">
+                                  Revoked
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-3 px-4 text-sm font-mono text-gray-900">
                             {cert.verificationCode || cert.shortCode}
@@ -622,7 +644,7 @@ const CertificatesPage = () => {
                     </div>
                     <div>
                       <label className="block text-xs text-gray-500 mb-1">Issuing Organization</label>
-                      <p className="font-medium text-gray-900">{selectedCertificate.orgName}</p>
+                      <p className="font-medium text-gray-900">{selectedCertificate.orgName || selectedCertificate.institutionName}</p>
                     </div>
                     <div>
                       <label className="block text-xs text-gray-500 mb-1">Issue Date</label>
@@ -635,6 +657,35 @@ const CertificatesPage = () => {
                   </div>
                 </div>
               </div>
+
+              {selectedCertificate.transfer && (
+                <div className="mb-6">
+                  <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Credit Transfer</h3>
+                  <div className="bg-blue-50 border border-blue-200 rounded-sm p-3 space-y-1">
+                    {selectedCertificate.transfer.transferredFrom && (
+                      <p className="text-sm text-gray-800">
+                        <FiInfo className="inline w-3.5 h-3.5 text-blue-700 mr-1 -mt-0.5" />
+                        Recognizes credit transferred from{' '}
+                        <span className="font-semibold">{selectedCertificate.transfer.transferredFrom.institutionName}</span>
+                        {' '}for{' '}
+                        <span className="font-semibold">{selectedCertificate.transfer.transferredFrom.courseName}</span>
+                        {selectedCertificate.transfer.agreementId
+                          ? ` under equivalency agreement #${selectedCertificate.transfer.agreementId}.`
+                          : '.'}
+                      </p>
+                    )}
+                    {selectedCertificate.transfer.transferredTo && (
+                      <p className="text-sm text-gray-800">
+                        <FiInfo className="inline w-3.5 h-3.5 text-blue-700 mr-1 -mt-0.5" />
+                        Later superseded by a certificate at{' '}
+                        <span className="font-semibold">{selectedCertificate.transfer.transferredTo.institutionName}</span>
+                        {' '}for{' '}
+                        <span className="font-semibold">{selectedCertificate.transfer.transferredTo.courseName}</span>.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {selectedCertificate.blockchainTx && (
                 <div className="mb-6">

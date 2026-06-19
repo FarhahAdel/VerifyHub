@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import User from '../models/user.model.js';
+import Certificate from '../models/certificate.model.js';
 import { getStudentRegistryContract, getWeb3 } from '../utils/blockchain.js';
 import { successResponse } from '../utils/responseUtils.js';
 import { errorResponse } from '../utils/errorUtils.js';
@@ -57,6 +58,18 @@ export const getEnrollmentStatus = async (req, res) => {
     const studentData = await registry.methods.getStudent(student.walletAddress).call();
     const certificateIds = studentData[3] || [];
 
+    // StudentRegistry never unlinks a certificate once issued — a certificate that
+    // was revoked and superseded during a credit transfer stays in this list for
+    // history. Filter down to currently-active ones for the count a student sees,
+    // so "I transferred and now have 2 certificates" doesn't happen for what's
+    // really one ongoing credential. Full history (including revoked ones) is still
+    // available via the /certificates page.
+    const certDocs = certificateIds.length
+      ? await Certificate.find({ certificateId: { $in: certificateIds } }).select('certificateId revoked')
+      : [];
+    const revokedSet = new Set(certDocs.filter(c => c.revoked).map(c => c.certificateId));
+    const activeCertificateIds = certificateIds.filter(id => !revokedSet.has(id));
+
     return res.status(200).json(successResponse({
       registered: true,
       enrolled: isEnrolled,
@@ -66,8 +79,9 @@ export const getEnrollmentStatus = async (req, res) => {
         walletAddress: institute.walletAddress,
         logo: institute.institutionLogo
       } : null,
-      certificateCount: certificateIds.length,
-      certificateIds
+      certificateCount: activeCertificateIds.length,
+      certificateIds: activeCertificateIds,
+      totalCertificateCount: certificateIds.length
     }, 'Enrollment status fetched'));
   } catch (error) {
     console.error('[Enrollment] getEnrollmentStatus error:', error);

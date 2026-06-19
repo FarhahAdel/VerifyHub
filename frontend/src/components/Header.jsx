@@ -122,7 +122,6 @@ export default function Header() {
     const commonItems = [
       { icon: FiHome, label: "Home", path: "/" },
       { icon: FiCheckSquare, label: "Verify", path: "/verify" },
-      { icon: FiList, label: "My Certificates", path: "/my-certificates" },
     ];
 
     // Items visible only to authenticated users based on role
@@ -135,12 +134,14 @@ export default function Header() {
         { icon: FiUpload, label: "Upload", path: "/upload" },
         { icon: FiUsers, label: "Agreements", path: "/agreements" },
         { icon: FiList, label: "Courses", path: "/courses" },
+        { icon: FiList, label: "My Certificates", path: "/certificates" },
       ];
     } else if (user.role === "STUDENT") {
       return [
         ...commonItems,
         { icon: FiUserPlus, label: "Enroll", path: "/enroll" },
         { icon: FiRepeat, label: "Transfer", path: "/transfer" },
+        { icon: FiList, label: "My Certificates", path: "/certificates" },
       ];
     } else if (user.role === "VERIFIER") {
       return [

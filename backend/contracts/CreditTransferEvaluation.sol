@@ -30,10 +30,11 @@ contract CreditTransferEvaluation {
     // ─── Types ──────────────────────────────────────────────────────────────────
 
     struct CourseResult {
-        string certificateId;       // Certification.sol / StudentRegistry certificate id
+        string certificateId;       // Certification.sol / StudentRegistry certificate id (source/old cert)
         string sourceCourseId;      // Course._id at the source institute ("" if no catalog match)
         string destinationCourseId; // Course._id at the destination institute ("" if rejected)
         bool   accepted;            // true => a matching equivalency rule was found
+        string newCertificateId;    // destination-institute cert that supersedes certificateId ("" until reissued)
     }
 
     struct Evaluation {
@@ -74,6 +75,13 @@ contract CreditTransferEvaluation {
         uint256 indexed evaluationId,
         address indexed student,
         address indexed destinationInstitute
+    );
+
+    event CertificateReissued(
+        uint256 indexed evaluationId,
+        uint256 resultIndex,
+        string oldCertificateId,
+        string newCertificateId
     );
 
     // ─── Modifiers ──────────────────────────────────────────────────────────────
@@ -141,7 +149,8 @@ contract CreditTransferEvaluation {
                 certificateId: certificateIds[i],
                 sourceCourseId: sourceCourseIds[i],
                 destinationCourseId: destinationCourseIds[i],
-                accepted: accepted[i]
+                accepted: accepted[i],
+                newCertificateId: ""
             }));
 
             if (accepted[i]) acceptedCount++;
@@ -176,6 +185,34 @@ contract CreditTransferEvaluation {
         emit EnrollmentUpdatedFromTransfer(id, e.student, e.destinationInstitute);
     }
 
+    /**
+     * Record that an accepted course's source certificate has been revoked and
+     * replaced by a new certificate at the destination institute. Called once per
+     * accepted result, after the backend has separately called
+     * Certification.revokeCertificate() on the old id and Certification.generateCertificate()
+     * + StudentRegistry.linkCertificate() for the new one. One-way: cannot be unset
+     * or overwritten, preserving an immutable old-id -> new-id trail.
+     */
+    function recordCertificateReissue(
+        uint256 id,
+        uint256 resultIndex,
+        string memory newCertificateId
+    )
+        public onlyOwner evaluationExists(id)
+    {
+        Evaluation storage e = evaluations[id];
+        require(resultIndex < e.results.length, "Result index out of range");
+
+        CourseResult storage r = e.results[resultIndex];
+        require(r.accepted, "Result was not accepted");
+        require(bytes(r.newCertificateId).length == 0, "Certificate reissue already recorded");
+        require(bytes(newCertificateId).length > 0, "Empty certificate id");
+
+        r.newCertificateId = newCertificateId;
+
+        emit CertificateReissued(id, resultIndex, r.certificateId, newCertificateId);
+    }
+
     // ─── Read functions (public view) ───────────────────────────────────────────
 
     function getEvaluation(uint256 id)
@@ -207,12 +244,13 @@ contract CreditTransferEvaluation {
             string memory certificateId,
             string memory sourceCourseId,
             string memory destinationCourseId,
-            bool accepted
+            bool accepted,
+            string memory newCertificateId
         )
     {
         require(index < evaluations[id].results.length, "Result index out of range");
         CourseResult storage r = evaluations[id].results[index];
-        return (r.certificateId, r.sourceCourseId, r.destinationCourseId, r.accepted);
+        return (r.certificateId, r.sourceCourseId, r.destinationCourseId, r.accepted, r.newCertificateId);
     }
 
     function getAllEvaluationResults(uint256 id)
@@ -222,7 +260,8 @@ contract CreditTransferEvaluation {
             string[] memory certificateIds,
             string[] memory sourceCourseIds,
             string[] memory destinationCourseIds,
-            bool[] memory accepted
+            bool[] memory accepted,
+            string[] memory newCertificateIds
         )
     {
         Evaluation storage e = evaluations[id];
@@ -231,11 +270,13 @@ contract CreditTransferEvaluation {
         sourceCourseIds = new string[](len);
         destinationCourseIds = new string[](len);
         accepted = new bool[](len);
+        newCertificateIds = new string[](len);
         for (uint256 i = 0; i < len; i++) {
             certificateIds[i] = e.results[i].certificateId;
             sourceCourseIds[i] = e.results[i].sourceCourseId;
             destinationCourseIds[i] = e.results[i].destinationCourseId;
             accepted[i] = e.results[i].accepted;
+            newCertificateIds[i] = e.results[i].newCertificateId;
         }
     }
 

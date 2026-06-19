@@ -37,6 +37,23 @@ const CertificateSchema = new mongoose.Schema(
       enum: ['internal', 'external'],
       default: 'internal'
     },
+    // Mirrors Certification.sol's on-chain `revoked` flag, kept in sync by the
+    // backend whenever it calls revokeCertificate/reactivateCertificate, so
+    // "is this certificate currently active" can be checked without a chain call
+    // per certificate. The chain remains the source of truth.
+    revoked: { type: Boolean, default: false },
+    // supersedes / supersededBy are immutable historical breadcrumbs recording the
+    // sequence of institute transfers this certificate has been part of — set once,
+    // never edited afterwards. They are NOT "is this currently active" pointers:
+    // a transfer back to an institute/course a student previously held reactivates
+    // the original certificate (see Certification.reactivateCertificate) rather than
+    // minting a new one, so `revoked` (above) is the only authoritative active/inactive
+    // signal — supersedes/supersededBy just describe the journey.
+    supersedes: { type: String, default: null },
+    supersededBy: { type: String, default: null },
+    // EquivalencyAgreement id (CreditTransferEvaluation.sol) this certificate was
+    // created or restored under, if it resulted from a credit transfer.
+    transferAgreementId: { type: Number, default: null },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
   },
@@ -54,7 +71,9 @@ const CertificateSchema = new mongoose.Schema(
       { issuer: 1 },
       { issuedDate: 1 },
       { blockchainTxId: 1 },
-      { recipientEmail: 1 }
+      { recipientEmail: 1 },
+      { supersedes: 1 },
+      { revoked: 1 }
     ]
   }
 );

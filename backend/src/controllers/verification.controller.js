@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { getContract } from '../utils/blockchain.js';
 import Certificate from '../models/certificate.model.js';
 import { helpers } from './certificate.controller.js';
+import { resolveTransferLineage } from '../utils/certificateUtils.js';
 import { verificationResponse, successResponse } from '../utils/responseUtils.js';
 import { errorResponse, ErrorCodes } from '../utils/errorUtils.js';
 
@@ -118,6 +119,7 @@ export const verifyCertificateById = async (req, res) => {
     }
 
     // Return standardized verification response
+    const transfer = await resolveTransferLineage(certificate);
     return res.json(verificationResponse(
       status,
       {
@@ -129,7 +131,8 @@ export const verifyCertificateById = async (req, res) => {
         issuedAt: certificate.createdAt,
         ipfsHash: certificate.ipfsHash,
         shortCode: certificate.shortCode,
-        revoked: certificate.revoked || false
+        revoked: certificate.revoked || false,
+        ...(transfer ? { transfer } : {}),
       },
       verificationId,
       {
@@ -249,6 +252,7 @@ export const verifyCertificateByShortCode = async (req, res) => {
     }
 
     // Return standardized response
+    const transfer = await resolveTransferLineage(certificate);
     return res.json(verificationResponse(
       status,
       {
@@ -261,7 +265,8 @@ export const verifyCertificateByShortCode = async (req, res) => {
         issuedAt: certificate.createdAt,
         revoked: certificate.revoked || false,
         verificationCode: certificate.verificationCode || certificate.shortCode,
-        blockchainTxId: certificate.blockchainTxId || certificate.transactionId
+        blockchainTxId: certificate.blockchainTxId || certificate.transactionId,
+        ...(transfer ? { transfer } : {}),
       },
       verificationId,
       {

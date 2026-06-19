@@ -39,7 +39,8 @@ import {
   formatCertificateResponse,
   findCertificateByHash,
   uploadToIPFS,
-  findCertificateByAnyHash
+  findCertificateByAnyHash,
+  resolveTransferLineage
 } from '../utils/certificateUtils.js';
 import {
   successResponse,
@@ -1046,22 +1047,24 @@ export const verifyCertificateById = async (req, res) => {
 
         // Parse the blockchain data
         const parsedData = parseCertificateData(blockchainData);
+        const transfer = await resolveTransferLineage(certificate);
 
         return res.json({
-          status: 'VALID',
+          status: parsedData.revoked ? 'REVOKED' : 'VALID',
           certificate: {
-            uid: certificate.uid,
+            referenceId: certificate.referenceId,
             certificateId: certificate.certificateId,
             candidateName: certificate.candidateName,
             courseName: certificate.courseName,
-            orgName: certificate.orgName,
+            institutionName: certificate.institutionName,
             issuedDate: certificate.issuedDate,
             generationDate: certificate.generationDate,
-            transactionId: certificate.transactionId,
-            digitalSignature: certificate.digitalSignature,
+            blockchainTxId: certificate.blockchainTxId || certificate.blockchainTx,
+            cryptographicSignature: certificate.cryptographicSignature,
             ipfsHash: certificate.ipfsHash,
             timestamp: parsedData.timestamp,
-            revoked: parsedData.revoked
+            revoked: parsedData.revoked,
+            ...(transfer ? { transfer } : {}),
           },
           verificationId,
           _links: {

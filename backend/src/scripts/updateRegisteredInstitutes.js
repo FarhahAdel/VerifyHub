@@ -63,7 +63,7 @@ async function migrateInstitutes() {
     console.log('✅ Connected to MongoDB');
 
     // 2. Fetch institutes not yet registered on-chain (or all, if no flag)
-    const institutes = await User.find({ role: "INSTITUTE" });
+    const institutes = await User.find({ role: "STUDENT" });
     console.log(`📋 Found ${institutes.length} institutes to register`);
 
     if (institutes.length === 0) {
@@ -84,7 +84,7 @@ async function migrateInstitutes() {
       console.log(`➡️ Registering ${inst.name} (${inst.walletAddress})...`);
       try {
         // Check if already registered on-chain (optional safety)
-        const isRegistered = await contract.isInstituteRegistered(inst.walletAddress);
+        const isRegistered = await contract.isStudentRegistered(inst.walletAddress);
         if (isRegistered) {
           console.log(`⚠️ Already registered on-chain, skipping.`);
           // Optionally update MongoDB flag
@@ -93,7 +93,7 @@ async function migrateInstitutes() {
           continue;
         }
 
-        const tx = await contract.registerInstitute(inst.walletAddress, inst.name);
+        const tx = await contract.registerStudent(inst.walletAddress, inst.name);
         await tx.wait();
         console.log(`✅ Success: ${inst.name}`);
 

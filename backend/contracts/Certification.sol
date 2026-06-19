@@ -29,6 +29,7 @@ contract Certification {
     );
     
     event CertificateRevoked(string indexed certificateId);
+    event CertificateReactivated(string indexed certificateId);
 
     constructor() {
         owner = msg.sender;
@@ -125,5 +126,19 @@ contract Certification {
         
         certificates[certificateId].revoked = true;
         emit CertificateRevoked(certificateId);
+    }
+
+    /**
+     * Reverses a revocation. Used when a student transfers back to an institute/course
+     * they previously held a (now-revoked) certificate for — the original certificate
+     * is restored instead of minting a redundant duplicate.
+     */
+    function reactivateCertificate(string memory certificateId) public onlyOwner {
+        Certificate memory c = certificates[certificateId];
+        require(bytes(c.referenceId).length != 0, "Certificate not found");
+        require(c.revoked, "Certificate is not revoked");
+
+        certificates[certificateId].revoked = false;
+        emit CertificateReactivated(certificateId);
     }
 }

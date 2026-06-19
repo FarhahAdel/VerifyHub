@@ -212,13 +212,13 @@ const EnrollmentPage = () => {
                       <span className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-sm font-medium flex-shrink-0">
                         Enrolled
                       </span>
-                    ) : (
+                    ) : !status?.enrolled && (
                       <button
                         onClick={() => handleEnroll(inst.id)}
                         disabled={actionLoading}
                         className="text-xs bg-gray-800 text-white px-3 py-1.5 rounded-sm hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 font-medium"
                       >
-                        {actionLoading ? 'Please wait…' : status?.enrolled ? 'Switch' : 'Enroll'}
+                        {'Enroll'}
                       </button>
                     )}
                   </li>

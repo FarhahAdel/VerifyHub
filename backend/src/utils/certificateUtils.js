@@ -6,11 +6,69 @@ import { contract } from './blockchain.js';
 import * as pinata from './pinata.js';
 
 /**
+ * Resolve a certificate's transfer lineage (if any) into a display-friendly block:
+ * which institute/course it replaced, what (if anything) later replaced it, and
+ * which equivalency agreement justified the move. Returns null for certificates
+ * that were never part of a credit transfer.
+ */
+export const resolveTransferLineage = async (certificate) => {
+  if (!certificate.supersedes && !certificate.supersededBy && !certificate.transferAgreementId) {
+    return null;
+  }
+  const ids = [certificate.supersedes, certificate.supersededBy].filter(Boolean);
+  const docs = ids.length
+    ? await Certificate.find({ certificateId: { $in: ids } })
+        .select('certificateId institutionName courseName issuedDate revoked')
+    : [];
+  const map = new Map(docs.map(d => [d.certificateId, d]));
+  const format = (id) => {
+    const d = id && map.get(id);
+    return d
+      ? { certificateId: d.certificateId, institutionName: d.institutionName, courseName: d.courseName, issuedDate: d.issuedDate, revoked: d.revoked }
+      : null;
+  };
+  return {
+    agreementId: certificate.transferAgreementId,
+    transferredFrom: format(certificate.supersedes), // the certificate this one replaced
+    transferredTo: format(certificate.supersededBy),  // what later replaced this one, if anything
+  };
+};
+
+/**
  * Generate a standardized certificate hash
  */
 export const generateCertificateId = (uid, candidateName, courseName, orgName) => {
   const normalizedData = `${uid}|${candidateName.trim().toLowerCase()}|${courseName.trim().toLowerCase()}|${orgName.trim().toLowerCase()}`;
   return crypto.createHash('sha256').update(normalizedData).digest('hex');
+};
+
+/**
+ * Same hash used by the main generateCertificate flow (certificate.controller.js),
+ * duplicated here (instead of importing that controller) so lighter-weight callers
+ * like transfer.controller.js don't have to pull in multer/PDF/email dependencies
+ * just to compute a certificate id.
+ */
+export const generateCertificateHash = (
+  referenceId,
+  candidateName,
+  courseName,
+  institutionName,
+  issuedDate = "") => {
+  const normalizedData = `${referenceId}|${candidateName.trim().toLowerCase()}|${courseName.trim().toLowerCase()}|${institutionName.trim().toLowerCase()}|${issuedDate}`;
+  return crypto.createHash('sha256').update(normalizedData).digest('hex');
+};
+
+/**
+ * 4-character uppercase alphanumeric verification code (unambiguous character set).
+ */
+export const generateVerificationShortCode = () => {
+  const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const randomBytes = crypto.randomBytes(8);
+  let result = '';
+  for (let i = 0; i < 4; i++) {
+    result += characters.charAt(randomBytes[i] % characters.length);
+  }
+  return result;
 };
 
 /**

@@ -192,6 +192,8 @@ const VerifyCertificate = () => {
         sha256Hash: '',
         timestamp: '',
         issuedAt: '',
+        revoked: false,
+        transfer: null,
         shortCode: data.certificate?.verificationCode || data.verificationId?.substring(0, 6) || data.certificate?.shortCode
       },
       transaction: { hash: '' },
@@ -202,14 +204,16 @@ const VerifyCertificate = () => {
     if (data.certificate) {
       const cert = data.certificate;
       Object.assign(normalized.certificate, {
-        uid: cert.uid || '',
+        uid: cert.uid || cert.referenceId || '',
         candidateName: cert.candidateName || '',
         courseName: cert.courseName || '',
-        orgName: cert.orgName || '',
+        orgName: cert.orgName || cert.institutionName || '',
         certificateId: cert.certificateId || cert.id || '',
         ipfsHash: cert.ipfsHash || data.cidHash || '',
         timestamp: cert.timestamp || '',
-        issuedAt: cert.issuedAt || ''
+        issuedAt: cert.issuedAt || '',
+        revoked: cert.revoked || data.status === 'REVOKED' || false,
+        transfer: cert.transfer || null
       });
 
       // Extract blockchain data if available
@@ -559,15 +563,34 @@ const VerifyCertificate = () => {
                       <path d="M35,35 L65,35 L65,65 L35,65 Z" fill="currentColor" className="text-gray-700" />
                     </svg>
                   </div>
-                  <div className="inline-flex items-center justify-center bg-gray-200 border border-gray-300 rounded-sm w-16 h-16 mb-3 shadow-inner relative z-10">
-                    <FiCheck className="w-8 h-8 text-gray-700" />
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-1 relative z-10">
-                    Certificate Verified Successfully
-                  </h3>
-                  <p className="text-gray-700 relative z-10">
-                    This certificate has been validated on the blockchain and is authentic.
-                  </p>
+                  {verificationResult.certificate?.revoked ? (
+                    <>
+                      <div className="inline-flex items-center justify-center bg-amber-100 border border-amber-300 rounded-sm w-16 h-16 mb-3 shadow-inner relative z-10">
+                        <FiRotateCcw className="w-8 h-8 text-amber-700" />
+                      </div>
+                      <h3 className="text-xl font-bold text-gray-900 mb-1 relative z-10">
+                        Certificate Revoked
+                      </h3>
+                      <p className="text-gray-700 relative z-10">
+                        This certificate is no longer active
+                        {verificationResult.certificate?.transfer?.transferredTo
+                          ? ' — credit was transferred to a new institute (see below).'
+                          : '.'}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="inline-flex items-center justify-center bg-gray-200 border border-gray-300 rounded-sm w-16 h-16 mb-3 shadow-inner relative z-10">
+                        <FiCheck className="w-8 h-8 text-gray-700" />
+                      </div>
+                      <h3 className="text-xl font-bold text-gray-900 mb-1 relative z-10">
+                        Certificate Verified Successfully
+                      </h3>
+                      <p className="text-gray-700 relative z-10">
+                        This certificate has been validated on the blockchain and is authentic.
+                      </p>
+                    </>
+                  )}
                 </div>
 
                 {/* Certificate Content in 2 columns */}
@@ -657,6 +680,55 @@ const VerifyCertificate = () => {
                               </div>
                             )}
                           </div>
+
+                          {verificationResult.certificate?.transfer && (
+                            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-sm p-3">
+                              <div className="flex items-center mb-2">
+                                <FiRotateCcw className="w-4 h-4 text-blue-700 mr-2" />
+                                <span className="text-xs font-medium text-blue-700 uppercase">
+                                  Credit Transfer
+                                </span>
+                              </div>
+                              {verificationResult.certificate.transfer.transferredFrom && (
+                                <p className="text-sm text-gray-800 mb-1">
+                                  This certificate recognizes credit transferred from{' '}
+                                  <span className="font-semibold">
+                                    {verificationResult.certificate.transfer.transferredFrom.institutionName}
+                                  </span>
+                                  {' '}for{' '}
+                                  <span className="font-semibold">
+                                    {verificationResult.certificate.transfer.transferredFrom.courseName}
+                                  </span>
+                                  {verificationResult.certificate.transfer.agreementId
+                                    ? ` under equivalency agreement #${verificationResult.certificate.transfer.agreementId}.`
+                                    : '.'}
+                                </p>
+                              )}
+                              {verificationResult.certificate.transfer.transferredTo && (
+                                <p className="text-sm text-gray-800">
+                                  This certificate was later superseded by a certificate at{' '}
+                                  <span className="font-semibold">
+                                    {verificationResult.certificate.transfer.transferredTo.institutionName}
+                                  </span>
+                                  {' '}for{' '}
+                                  <span className="font-semibold">
+                                    {verificationResult.certificate.transfer.transferredTo.courseName}
+                                  </span>.
+                                  {' '}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCertificateId(verificationResult.certificate.transfer.transferredTo.certificateId);
+                                      setVerificationMethod('id');
+                                    }}
+                                    className="text-blue-700 underline hover:text-blue-900"
+                                  >
+                                    View it
+                                  </button>
+                                </p>
+                              )}
+                            </div>
+                          )}
 
                           {/* Timestamp/Issue Date */}
                           {(verificationResult.certificate?.timestamp || verificationResult.certificate?.issuedAt) && (
